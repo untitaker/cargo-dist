@@ -41,10 +41,6 @@ pub struct ForgejoCiLayer {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub build_runner: Option<String>,
 
-    /// Repository URL for downloading cargo-dist binary (plan jobs)
-    /// If not specified, defaults to https://github.com/axodotdev/cargo-dist
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cargo_dist_repository: Option<String>,
 }
 
 /// forgejo ci config (final)
@@ -71,8 +67,6 @@ pub struct ForgejoCiConfig {
     /// Custom Forgejo runner for build jobs
     pub build_runner: Option<String>,
 
-    /// Repository URL for downloading cargo-dist binary (plan jobs)
-    pub cargo_dist_repository: Option<String>,
 }
 
 impl ForgejoCiConfig {
@@ -89,7 +83,6 @@ impl ForgejoCiConfig {
             action_commits: SortedMap::new(),
             plan_runner: None,
             build_runner: None,
-            cargo_dist_repository: None,
         }
     }
 }
@@ -106,7 +99,6 @@ impl ApplyLayer for ForgejoCiConfig {
             action_commits,
             plan_runner,
             build_runner,
-            cargo_dist_repository,
         }: Self::Layer,
     ) {
         self.common.apply_layer(common);
@@ -126,9 +118,6 @@ impl ApplyLayer for ForgejoCiConfig {
         if build_runner.is_some() {
             self.build_runner = build_runner;
         }
-        if cargo_dist_repository.is_some() {
-            self.cargo_dist_repository = cargo_dist_repository;
-        }
     }
 }
 
@@ -144,7 +133,6 @@ impl ApplyLayer for ForgejoCiLayer {
             action_commits,
             plan_runner,
             build_runner,
-            cargo_dist_repository,
         }: Self::Layer,
     ) {
         self.common.apply_layer(common);
@@ -169,9 +157,6 @@ impl ApplyLayer for ForgejoCiLayer {
         }
         if build_runner.is_some() {
             self.build_runner = build_runner;
-        }
-        if cargo_dist_repository.is_some() {
-            self.cargo_dist_repository = cargo_dist_repository;
         }
         // TODO: Handle runners properly when we implement that
     }

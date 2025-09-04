@@ -188,7 +188,6 @@ impl DistMetadata {
             Some(ForgejoCiLayer {
                 plan_runner: forgejo_plan_runner.clone(),
                 build_runner: forgejo_build_runner.clone(),
-                cargo_dist_repository: forgejo_cargo_dist_repository.clone(),
                 ..ForgejoCiLayer::default()
             })
         });

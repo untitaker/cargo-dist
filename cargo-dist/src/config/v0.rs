@@ -504,9 +504,6 @@ pub struct DistMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub forgejo_build_runner: Option<String>,
 
-    /// Repository URL for downloading cargo-dist binary (Forgejo plan jobs)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub forgejo_cargo_dist_repository: Option<String>,
 
     /// Custom permissions for jobs
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -665,7 +662,6 @@ impl DistMetadata {
             omnibor: _,
             forgejo_plan_runner: _,
             forgejo_build_runner: _,
-            forgejo_cargo_dist_repository: _,
         } = self;
         if let Some(include) = include {
             for include in include {
@@ -775,7 +771,6 @@ impl DistMetadata {
             omnibor,
             forgejo_plan_runner,
             forgejo_build_runner,
-            forgejo_cargo_dist_repository,
         } = self;
 
         // Check for global settings on local packages
