@@ -496,6 +496,18 @@ pub struct DistMetadata {
     pub github_custom_runners:
         Option<SortedMap<TripleName, StringLikeOr<GithubRunner, GithubRunnerConfigInput>>>,
 
+    /// Custom Forgejo runner for plan job
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub forgejo_plan_runner: Option<String>,
+
+    /// Custom Forgejo runner for build jobs  
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub forgejo_build_runner: Option<String>,
+
+    /// Repository URL for downloading cargo-dist binary (Forgejo plan jobs)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub forgejo_cargo_dist_repository: Option<String>,
+
     /// Custom permissions for jobs
     #[serde(skip_serializing_if = "Option::is_none")]
     pub github_custom_job_permissions: Option<SortedMap<String, GithubPermissionMap>>,
@@ -651,6 +663,9 @@ impl DistMetadata {
             cargo_auditable: _,
             cargo_cyclonedx: _,
             omnibor: _,
+            forgejo_plan_runner: _,
+            forgejo_build_runner: _,
+            forgejo_cargo_dist_repository: _,
         } = self;
         if let Some(include) = include {
             for include in include {
@@ -758,6 +773,9 @@ impl DistMetadata {
             cargo_auditable,
             cargo_cyclonedx,
             omnibor,
+            forgejo_plan_runner,
+            forgejo_build_runner,
+            forgejo_cargo_dist_repository,
         } = self;
 
         // Check for global settings on local packages
@@ -876,6 +894,12 @@ impl DistMetadata {
         }
         if github_custom_runners.is_some() {
             warn!("package.metadata.dist.github-custom-runners is set, but this is only accepted in workspace.metadata (value is being ignored): {}", package_manifest_path);
+        }
+        if forgejo_plan_runner.is_some() {
+            warn!("package.metadata.dist.forgejo-plan-runner is set, but this is only accepted in workspace.metadata (value is being ignored): {}", package_manifest_path);
+        }
+        if forgejo_build_runner.is_some() {
+            warn!("package.metadata.dist.forgejo-build-runner is set, but this is only accepted in workspace.metadata (value is being ignored): {}", package_manifest_path);
         }
         if github_build_setup.is_some() {
             warn!("package.metadata.dist.github-build-setup is set, but this is only accepted in workspace.metadata (value is being ignored): {}", package_manifest_path);

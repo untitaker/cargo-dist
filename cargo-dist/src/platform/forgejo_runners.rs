@@ -12,6 +12,7 @@ static KNOWN_FORGEJO_RUNNERS: std::sync::LazyLock<HashMap<&'static str, &'static
     runners.insert("ubuntu-latest", t::TARGET_X64_LINUX_GNU);
     runners.insert("ubuntu-22.04", t::TARGET_X64_LINUX_GNU);
     runners.insert("ubuntu-20.04", t::TARGET_X64_LINUX_GNU);
+    runners.insert("docker", t::TARGET_X64_LINUX_GNU);
     
     runners
 });

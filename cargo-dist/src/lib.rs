@@ -875,6 +875,7 @@ pub fn run_generate(dist: &DistGraph, args: &GenerateArgs) -> DistResult<()> {
                 GenerateMode::Ci => {
                     // If you add a CI backend, call it here
                     let CiInfo { github, forgejo } = &dist.ci;
+                    eprintln!("DEBUG: lib.rs - CI generation mode, github: {:?}, forgejo: {:?}", github.is_some(), forgejo.is_some());
                     if let Some(github) = github {
                         eprintln!("DEBUG: lib.rs - Processing GitHub CI");
                         if args.check {

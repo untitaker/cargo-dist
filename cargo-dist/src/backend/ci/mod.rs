@@ -94,6 +94,7 @@ pub enum DistInstallStrategy {
 
 impl DistInstallSettings<'_> {
     fn install_strategy(&self) -> DistInstallStrategy {
+        eprintln!("DEBUG: DistInstallSettings::install_strategy - repository_url: {:?}", self.repository_url);
         if let Some(branch) = self.version.pre.strip_prefix("github-") {
             return DistInstallStrategy::GitBranch {
                 branch: branch.to_owned(),
@@ -125,10 +126,16 @@ impl DistInstallSettings<'_> {
 
         // Use the actual repository URL if provided, otherwise fall back to default
         let base_url = if let Some(repo_url) = &self.repository_url {
-            format!("{}/releases/download", repo_url)
+            let url = format!("{}/releases/download", repo_url);
+            eprintln!("DEBUG: DistInstallSettings - Using custom base_url: {}", url);
+            url
         } else {
+            eprintln!("DEBUG: DistInstallSettings - Using default base_url: {}", BASE_DIST_FETCH_URL);
             BASE_DIST_FETCH_URL.to_owned()
         };
+        
+        eprintln!("DEBUG: DistInstallSettings - Final installer_url: {}/v{}", base_url, version);
+        eprintln!("DEBUG: DistInstallSettings - Final installer_name: {}", installer_name);
 
         DistInstallStrategy::Installer {
             installer_url: format!("{}/v{}", base_url, version),

@@ -258,6 +258,8 @@ fn get_new_dist_metadata(
             cargo_auditable: None,
             cargo_cyclonedx: None,
             omnibor: None,
+            forgejo_plan_runner: None,
+            forgejo_build_runner: None,
         }
     };
 
@@ -767,6 +769,8 @@ fn apply_dist_to_metadata(metadata: &mut toml_edit::Item, meta: &DistMetadata) {
         system_dependencies: _,
         github_build_setup: _,
         binaries: _,
+        forgejo_plan_runner: _,
+        forgejo_build_runner: _,
     } = &meta;
 
     // Forcibly inline the default install_path if not specified,

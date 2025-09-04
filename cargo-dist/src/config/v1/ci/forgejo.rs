@@ -32,6 +32,19 @@ pub struct ForgejoCiLayer {
     /// Use these commits for actions (if using GitHub-compatible actions)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action_commits: Option<SortedMap<String, String>>,
+
+    /// Custom Forgejo runner for plan job
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan_runner: Option<String>,
+
+    /// Custom Forgejo runner for build jobs  
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub build_runner: Option<String>,
+
+    /// Repository URL for downloading cargo-dist binary (plan jobs)
+    /// If not specified, defaults to https://github.com/axodotdev/cargo-dist
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cargo_dist_repository: Option<String>,
 }
 
 /// forgejo ci config (final)
@@ -51,6 +64,15 @@ pub struct ForgejoCiConfig {
 
     /// Use these commits for actions (if using GitHub-compatible actions)
     pub action_commits: SortedMap<String, String>,
+
+    /// Custom Forgejo runner for plan job
+    pub plan_runner: Option<String>,
+
+    /// Custom Forgejo runner for build jobs
+    pub build_runner: Option<String>,
+
+    /// Repository URL for downloading cargo-dist binary (plan jobs)
+    pub cargo_dist_repository: Option<String>,
 }
 
 impl ForgejoCiConfig {
@@ -65,6 +87,9 @@ impl ForgejoCiConfig {
             permissions: SortedMap::new(),
             build_setup: None,
             action_commits: SortedMap::new(),
+            plan_runner: None,
+            build_runner: None,
+            cargo_dist_repository: None,
         }
     }
 }
@@ -79,6 +104,9 @@ impl ApplyLayer for ForgejoCiConfig {
             permissions,
             build_setup,
             action_commits,
+            plan_runner,
+            build_runner,
+            cargo_dist_repository,
         }: Self::Layer,
     ) {
         self.common.apply_layer(common);
@@ -91,6 +119,15 @@ impl ApplyLayer for ForgejoCiConfig {
         }
         if let Some(commits) = action_commits {
             self.action_commits.extend(commits);
+        }
+        if plan_runner.is_some() {
+            self.plan_runner = plan_runner;
+        }
+        if build_runner.is_some() {
+            self.build_runner = build_runner;
+        }
+        if cargo_dist_repository.is_some() {
+            self.cargo_dist_repository = cargo_dist_repository;
         }
     }
 }
@@ -105,6 +142,9 @@ impl ApplyLayer for ForgejoCiLayer {
             permissions,
             build_setup,
             action_commits,
+            plan_runner,
+            build_runner,
+            cargo_dist_repository,
         }: Self::Layer,
     ) {
         self.common.apply_layer(common);
@@ -123,6 +163,15 @@ impl ApplyLayer for ForgejoCiLayer {
                 self.action_commits = Some(SortedMap::new());
             }
             self.action_commits.as_mut().unwrap().extend(commits);
+        }
+        if plan_runner.is_some() {
+            self.plan_runner = plan_runner;
+        }
+        if build_runner.is_some() {
+            self.build_runner = build_runner;
+        }
+        if cargo_dist_repository.is_some() {
+            self.cargo_dist_repository = cargo_dist_repository;
         }
         // TODO: Handle runners properly when we implement that
     }

@@ -88,6 +88,7 @@ declare_strongly_typed_string! {
     pub struct ContainerImage => &ContainerImageRef;
 }
 
+
 /// Github runners configuration (which github image/container should be used
 /// to build which target).
 pub type GithubRunners = BTreeMap<TripleName, GithubRunnerConfig>;

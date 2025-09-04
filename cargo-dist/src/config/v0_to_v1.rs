@@ -79,6 +79,8 @@ impl DistMetadata {
             hosting,
             extra_artifacts,
             github_custom_runners,
+            forgejo_plan_runner,
+            forgejo_build_runner,
             github_custom_job_permissions,
             bin_aliases,
             tag_namespace,
@@ -183,7 +185,12 @@ impl DistMetadata {
         let forgejo_ci_layer = list_to_bool_layer(is_global, &ci, CiStyle::Forgejo, || {
             // Create a basic Forgejo CI layer when Forgejo is requested
             eprintln!("DEBUG: v0_to_v1 - Creating Forgejo CI layer in callback");
-            Some(ForgejoCiLayer::default())
+            Some(ForgejoCiLayer {
+                plan_runner: forgejo_plan_runner.clone(),
+                build_runner: forgejo_build_runner.clone(),
+                cargo_dist_repository: forgejo_cargo_dist_repository.clone(),
+                ..ForgejoCiLayer::default()
+            })
         });
         eprintln!("DEBUG: v0_to_v1 - forgejo_ci_layer result: {:?}", forgejo_ci_layer.is_some());
 

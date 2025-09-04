@@ -104,7 +104,9 @@ impl ForgejoCiInfo {
     /// Write release.yml to disk
     pub fn write_to_disk(&self, dist: &DistGraph, dry_run: bool) -> DistResult<()> {
         let ci_file = self.forgejo_ci_release_yml_path();
+        eprintln!("DEBUG: forgejo.rs - write_to_disk called, ci_file: {}", ci_file);
         let rendered = self.generate_forgejo_ci(dist)?;
+        eprintln!("DEBUG: forgejo.rs - Template rendered successfully, length: {}", rendered.len());
         if dry_run {
             // For dry run, just check if content would change
             return self.check(dist).map_err(|_| ()).or(Ok(()));
@@ -165,10 +167,22 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
     // Get the repository URL from hosting info  
     // Note: h.repo_path already starts with "/" so we don't need additional separator
     let repository_url = dist.hosting.as_ref().map(|h| {
-        format!("{}{}", h.domain, h.repo_path)
+        let url = format!("{}{}", h.domain, h.repo_path);
+        eprintln!("DEBUG: forgejo.rs - Repository URL constructed: {}", url);
+        url
     });
+    eprintln!("DEBUG: forgejo.rs - Final repository_url: {:?}", repository_url);
     
-    let dist_install_strategy = (DistInstallSettings {
+    // Plan job should use the default cargo-dist installer (from GitHub/official source)
+    let plan_dist_install_strategy = (DistInstallSettings {
+        version: dist_version,
+        url_override: dist.config.dist_url_override.as_deref(),
+        repository_url: None, // Use default source for plan job
+    })
+    .install_strategy();
+    
+    // Build jobs should use the project-specific repository URL for consistency
+    let build_dist_install_strategy = (DistInstallSettings {
         version: dist_version,
         url_override: dist.config.dist_url_override.as_deref(),
         repository_url: repository_url.clone(),
@@ -181,8 +195,13 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
         .map(|h| h.hosts.clone())
         .unwrap_or_else(|| vec![crate::config::HostingStyle::Forgejo]);
 
-    // Create default global runner config - using x86_64-unknown-linux-gnu as default for ubuntu-22.04
-    let global_runner = GithubRunnerRef::from_str("ubuntu-22.04").to_owned();
+    // Get configurable runner or use default
+    let plan_runner = config.plan_runner.as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or("ubuntu-22.04");
+    
+    // Create default global runner config - using x86_64-unknown-linux-gnu as default
+    let global_runner = GithubRunnerRef::from_str(plan_runner).to_owned();
     let host_triple = TripleNameRef::from_str("x86_64-unknown-linux-gnu").to_owned();
     let global_runner_config = dist_schema::GithubRunnerConfig {
         runner: global_runner,
@@ -191,7 +210,7 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
     };
     let global_task = dist_schema::GithubGlobalJobConfig {
         runner: global_runner_config,
-        install_dist: dist_install_strategy.for_triple(&dist_schema::target_lexicon::Triple::host()),
+        install_dist: plan_dist_install_strategy.for_triple(&dist_schema::target_lexicon::Triple::host()),
         dist_args: String::new(),
         install_cargo_cyclonedx: None,
         install_omnibor: None,
@@ -208,14 +227,19 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
         .collect();
     eprintln!("DEBUG: local_targets: {:?}", local_targets);
     
+    // Get configurable build runner or use default  
+    let build_runner = config.build_runner.as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or("ubuntu-22.04");
+    
     eprintln!("DEBUG: Creating tasks for {} targets", local_targets.len());
     
     if !local_targets.is_empty() {
         use std::fmt::Write;
         
-        // Use default ubuntu runner for all targets  
+        // Use configurable runner for all targets  
         let runner = dist_schema::GithubRunnerConfig {
-            runner: GithubRunnerRef::from_str("ubuntu-22.04").to_owned(),
+            runner: GithubRunnerRef::from_str(build_runner).to_owned(),
             host: TripleNameRef::from_str("x86_64-unknown-linux-gnu").to_owned(), 
             container: None,
         };
@@ -224,14 +248,8 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
         eprintln!("DEBUG: Processing {} targets with runner", targets.len());
         let real_triple = runner.real_triple();
         eprintln!("DEBUG: real_triple: {:?}", real_triple);
-        // Regenerate install strategy with repository URL for each job
-        let job_dist_install_strategy = (DistInstallSettings {
-            version: dist_version,
-            url_override: dist.config.dist_url_override.as_deref(),
-            repository_url: repository_url.clone(),
-        })
-        .install_strategy();
-        let install_dist = job_dist_install_strategy.for_triple(&real_triple);
+        // Use the build-specific install strategy for matrix jobs
+        let install_dist = build_dist_install_strategy.for_triple(&real_triple);
         eprintln!("DEBUG: install_dist created");
         
         let mut dist_args = String::from("--artifacts=local");
@@ -271,7 +289,7 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
         local_artifacts_jobs.push(ForgejoCiJob {
             id: "build-local-artifacts".to_string(),
             name: "build-local-artifacts".to_string(), 
-            runner: "ubuntu-22.04".to_string(),
+            runner: build_runner.to_string(),
             only_if_release: None,
             permissions: None,
         });
@@ -300,8 +318,8 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
         tag_namespace,
         root_permissions: None,
         create_release: true,
-        // Use the same install strategy for coordinator
-        dist_install_for_coordinator: dist_install_strategy.for_triple(&dist_schema::target_lexicon::Triple::host()),
+        // Use the plan install strategy for coordinator  
+        dist_install_for_coordinator: plan_dist_install_strategy.for_triple(&dist_schema::target_lexicon::Triple::host()),
         build_setup: config.build_setup.clone(),
     })
 }
