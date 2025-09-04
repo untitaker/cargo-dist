@@ -245,9 +245,16 @@ impl GithubCiInfo {
             dependencies.append(&mut release.config.builds.system_dependencies.clone());
         }
 
+        // Get the repository URL from hosting info
+        // Note: h.repo_path already starts with "/" so we don't need additional separator
+        let repository_url = dist.hosting.as_ref().map(|h| {
+            format!("{}{}", h.domain, h.repo_path)
+        });
+        
         let dist_install_strategy = (DistInstallSettings {
             version: dist_version,
             url_override: dist.config.dist_url_override.as_deref(),
+            repository_url,
         })
         .install_strategy();
         let cargo_auditable_install_strategy = CargoAuditableInstallStrategy;

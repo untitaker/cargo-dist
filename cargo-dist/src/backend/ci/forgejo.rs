@@ -162,9 +162,16 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
         release_branch.is_some() || pr_run_mode == dist_schema::PrRunMode::Upload;
     let cache_builds = config.common.cache_builds.unwrap_or(caching_could_be_profitable);
 
+    // Get the repository URL from hosting info  
+    // Note: h.repo_path already starts with "/" so we don't need additional separator
+    let repository_url = dist.hosting.as_ref().map(|h| {
+        format!("{}{}", h.domain, h.repo_path)
+    });
+    
     let dist_install_strategy = (DistInstallSettings {
         version: dist_version,
         url_override: dist.config.dist_url_override.as_deref(),
+        repository_url: repository_url.clone(),
     })
     .install_strategy();
 
@@ -217,7 +224,14 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
         eprintln!("DEBUG: Processing {} targets with runner", targets.len());
         let real_triple = runner.real_triple();
         eprintln!("DEBUG: real_triple: {:?}", real_triple);
-        let install_dist = dist_install_strategy.for_triple(&real_triple);
+        // Regenerate install strategy with repository URL for each job
+        let job_dist_install_strategy = (DistInstallSettings {
+            version: dist_version,
+            url_override: dist.config.dist_url_override.as_deref(),
+            repository_url: repository_url.clone(),
+        })
+        .install_strategy();
+        let install_dist = job_dist_install_strategy.for_triple(&real_triple);
         eprintln!("DEBUG: install_dist created");
         
         let mut dist_args = String::from("--artifacts=local");
@@ -286,6 +300,7 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
         tag_namespace,
         root_permissions: None,
         create_release: true,
+        // Use the same install strategy for coordinator
         dist_install_for_coordinator: dist_install_strategy.for_triple(&dist_schema::target_lexicon::Triple::host()),
         build_setup: config.build_setup.clone(),
     })

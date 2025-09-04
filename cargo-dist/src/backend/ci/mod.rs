@@ -54,6 +54,7 @@ pub struct CiInfo {
 struct DistInstallSettings<'a> {
     version: &'a Version,
     url_override: Option<&'a CargoDistUrlOverrideRef>,
+    repository_url: Option<String>,
 }
 
 /// Generates github steps to install a tool
@@ -114,13 +115,23 @@ impl DistInstallSettings<'_> {
         } else if format.artifact_names_contain_versions() {
             format!("cargo-dist-v{version}-installer")
         } else {
-            "cargo-dist-installer".to_owned()
+            // For Forgejo repos, use the simpler "dist-installer" name
+            if self.repository_url.as_ref().map_or(false, |url| !url.contains("axodotdev")) {
+                "dist-installer".to_owned()
+            } else {
+                "cargo-dist-installer".to_owned()
+            }
+        };
+
+        // Use the actual repository URL if provided, otherwise fall back to default
+        let base_url = if let Some(repo_url) = &self.repository_url {
+            format!("{}/releases/download", repo_url)
+        } else {
+            BASE_DIST_FETCH_URL.to_owned()
         };
 
         DistInstallStrategy::Installer {
-            // FIXME: it would be nice if these values were somehow using all the machinery
-            // to compute these values for packages we build *BUT* it's messy and not that important
-            installer_url: format!("{BASE_DIST_FETCH_URL}/v{version}"),
+            installer_url: format!("{}/v{}", base_url, version),
             installer_name,
         }
     }

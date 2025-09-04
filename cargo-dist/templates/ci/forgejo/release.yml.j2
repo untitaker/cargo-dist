@@ -166,8 +166,8 @@ jobs:
           {{{ build_setup }}}
       {{%- endif %}}
       - name: Install dist
-        run: |
-          {{{ dist_install_for_coordinator }}}
+        shell: ${{ matrix.install_dist.shell }}
+        run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest
       - name: Fetch local artifacts
         run: |
