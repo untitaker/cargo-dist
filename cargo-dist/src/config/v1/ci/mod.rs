@@ -1,16 +1,20 @@
 //! ci config
 
 pub mod github;
+pub mod forgejo;
 
 use super::*;
 
 use github::*;
+use forgejo::*;
 
 /// ci config (final)
 #[derive(Debug, Default, Clone)]
 pub struct CiConfig {
     /// github ci
     pub github: Option<GithubCiConfig>,
+    /// forgejo ci
+    pub forgejo: Option<ForgejoCiConfig>,
 }
 
 /// ci config (inheritance not yet folded)
@@ -20,6 +24,8 @@ pub struct CiConfigInheritable {
     pub common: CommonCiConfig,
     /// github ci
     pub github: Option<GithubCiLayer>,
+    /// forgejo ci
+    pub forgejo: Option<ForgejoCiLayer>,
 }
 
 /// ci config (raw from file)
@@ -31,6 +37,8 @@ pub struct CiLayer {
     pub common: CommonCiLayer,
     /// github ci fields
     pub github: Option<BoolOr<GithubCiLayer>>,
+    /// forgejo ci fields
+    pub forgejo: Option<BoolOr<ForgejoCiLayer>>,
 }
 impl CiConfigInheritable {
     /// get defaults for workspace config
@@ -38,24 +46,31 @@ impl CiConfigInheritable {
         Self {
             common: CommonCiConfig::defaults_for_workspace(workspaces),
             github: None,
+            forgejo: None,
         }
     }
     /// fold in inheritance and get final ci config
     pub fn apply_inheritance_for_workspace(self, workspaces: &WorkspaceGraph) -> CiConfig {
-        let Self { common, github } = self;
+        let Self { common, github, forgejo } = self;
         let github = github.map(|github| {
             let mut default = GithubCiConfig::defaults_for_workspace(workspaces, &common);
             default.apply_layer(github);
             default
         });
-        CiConfig { github }
+        let forgejo = forgejo.map(|forgejo| {
+            let mut default = ForgejoCiConfig::defaults_for_workspace(workspaces, &common);
+            default.apply_layer(forgejo);
+            default
+        });
+        CiConfig { github, forgejo }
     }
 }
 impl ApplyLayer for CiConfigInheritable {
     type Layer = CiLayer;
-    fn apply_layer(&mut self, Self::Layer { common, github }: Self::Layer) {
+    fn apply_layer(&mut self, Self::Layer { common, github, forgejo }: Self::Layer) {
         self.common.apply_layer(common);
         self.github.apply_bool_layer(github);
+        self.forgejo.apply_bool_layer(forgejo);
     }
 }
 

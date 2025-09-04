@@ -35,6 +35,9 @@ pub fn do_host(cfg: &Config, host_args: HostArgs) -> DistResult<DistManifest> {
                 HostingStyle::Github => {
                     // implemented in CI backend
                 }
+                HostingStyle::Forgejo => {
+                    // TODO: implement in CI backend
+                }
             }
         }
     }
@@ -53,9 +56,12 @@ impl<'a> DistGraphBuilder<'a> {
     ) -> DistResult<()> {
         let mut ci = vec![];
         {
-            let CiConfig { github } = &self.inner.config.ci;
+            let CiConfig { github, forgejo } = &self.inner.config.ci;
             if github.is_some() {
                 ci.push(CiStyle::Github);
+            }
+            if forgejo.is_some() {
+                ci.push(CiStyle::Forgejo);
             }
         }
 
@@ -133,6 +139,13 @@ impl<'a> DistGraphBuilder<'a> {
                             owner: hosting.owner.clone(),
                             repo: hosting.project.clone(),
                         })
+                    }
+                }
+                HostingStyle::Forgejo => {
+                    // TODO: implement Forgejo hosting
+                    let _repo_path = &hosting.repo_path;
+                    for (_name, _version) in &releases_without_hosting {
+                        // TODO: Add Forgejo hosting manifest support similar to GitHub
                     }
                 }
             }

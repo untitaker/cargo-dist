@@ -23,6 +23,8 @@ pub const TEMPLATE_INSTALLER_NPM: TemplateId = "installer/npm";
 pub const TEMPLATE_INSTALLER_NPM_RUN_JS: TemplateId = "installer/npm/run.js";
 /// Template key for the github ci.yml
 pub const TEMPLATE_CI_GITHUB: TemplateId = "ci/github/release.yml";
+/// Template key for the forgejo ci.yml
+pub const TEMPLATE_CI_FORGEJO: TemplateId = "ci/forgejo/release.yml";
 
 /// ID used to look up an environment in [`Templates::envs`][]
 type EnvId = &'static str;

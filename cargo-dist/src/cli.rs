@@ -387,6 +387,8 @@ pub struct UpdateArgs {
 pub enum CiStyle {
     /// Generate github CI that uploads to github releases
     Github,
+    /// Generate forgejo CI that uploads to forgejo releases
+    Forgejo,
 }
 
 impl CiStyle {
@@ -394,6 +396,7 @@ impl CiStyle {
     pub fn to_lib(self) -> dist::config::CiStyle {
         match self {
             CiStyle::Github => dist::config::CiStyle::Github,
+            CiStyle::Forgejo => dist::config::CiStyle::Forgejo,
         }
     }
 }

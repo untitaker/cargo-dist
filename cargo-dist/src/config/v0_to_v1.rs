@@ -231,6 +231,7 @@ impl DistMetadata {
                 post_announce_jobs,
             },
             github: github_ci_layer,
+            forgejo: None,
         });
 
         // hosts

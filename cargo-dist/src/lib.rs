@@ -874,12 +874,19 @@ pub fn run_generate(dist: &DistGraph, args: &GenerateArgs) -> DistResult<()> {
             match mode {
                 GenerateMode::Ci => {
                     // If you add a CI backend, call it here
-                    let CiInfo { github } = &dist.ci;
+                    let CiInfo { github, forgejo } = &dist.ci;
                     if let Some(github) = github {
                         if args.check {
                             github.check(dist)?;
                         } else {
                             github.write_to_disk(dist)?;
+                        }
+                    }
+                    if let Some(forgejo) = forgejo {
+                        if args.check {
+                            forgejo.load_and_check_schema(dist)?;
+                        } else {
+                            forgejo.write_to_disk(dist, false)?;
                         }
                     }
                 }

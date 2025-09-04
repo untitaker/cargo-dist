@@ -3012,17 +3012,22 @@ impl<'pkg_graph> DistGraphBuilder<'pkg_graph> {
     }
 
     fn compute_ci(&mut self) -> DistResult<()> {
-        let CiConfig { github } = &self.inner.config.ci;
+        let CiConfig { github, forgejo } = &self.inner.config.ci;
 
         let mut has_ci = false;
         if let Some(github_config) = github {
             has_ci = true;
             self.inner.ci.github = Some(GithubCiInfo::new(&self.inner, github_config)?);
         }
+        if let Some(_forgejo_config) = forgejo {
+            has_ci = true;
+            use crate::backend::ci::forgejo::generate_forgejo_ci;
+            self.inner.ci.forgejo = Some(generate_forgejo_ci(&self.inner)?);
+        }
 
         // apply to manifest
         if has_ci {
-            let CiInfo { github } = &self.inner.ci;
+            let CiInfo { github, forgejo: _ } = &self.inner.ci;
             let github = github.as_ref().map(|info| {
                 let external_repo_commit = info
                     .github_release
