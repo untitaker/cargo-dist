@@ -102,9 +102,14 @@ impl DistInstallSettings<'_> {
         }
 
         if let Some(url) = self.url_override.as_ref() {
+            let installer_name = if url.as_str().contains("axodotdev") {
+                "cargo-dist-installer".to_owned()
+            } else {
+                "dist-installer".to_owned()
+            };
             return DistInstallStrategy::Installer {
                 installer_url: url.as_str().to_owned(),
-                installer_name: "cargo-dist-installer".to_owned(),
+                installer_name,
             };
         }
 
