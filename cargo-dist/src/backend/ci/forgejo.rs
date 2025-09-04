@@ -3,7 +3,6 @@
 use camino::Utf8PathBuf;
 use dist_schema::{GithubRunnerRef, TripleNameRef};
 use serde::Serialize;
-use std::str::FromStr;
 
 use crate::{
     backend::{diff_files, templates::TEMPLATE_CI_FORGEJO},
@@ -209,8 +208,8 @@ pub fn generate_forgejo_ci(dist: &DistGraph) -> DistResult<ForgejoCiInfo> {
         
         // Use default ubuntu runner for all targets  
         let runner = dist_schema::GithubRunnerConfig {
-            runner: GithubRunnerRef::from_str("ubuntu-22.04").unwrap(),
-            host: TripleNameRef::from_str("x86_64-unknown-linux-gnu").unwrap(), 
+            runner: GithubRunnerRef::from_str("ubuntu-22.04").to_owned(),
+            host: TripleNameRef::from_str("x86_64-unknown-linux-gnu").to_owned(), 
             container: None,
         };
         let targets: Vec<&TripleNameRef> = local_targets.iter().copied().collect();
