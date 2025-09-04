@@ -130,6 +130,13 @@ pub enum AxoprojectError {
         url: String,
     },
 
+    /// Repository URL is not from a supported Forgejo instance
+    #[error("URL '{url}' is not from a supported Forgejo instance")]
+    NotForgejoError {
+        /// URL to the repository
+        url: String,
+    },
+
     /// We searched a changelog file but found no result
     #[error("couldn't find a suitable changelog entry for {version} in {path}")]
     ChangelogVersionNotFound {

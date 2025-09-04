@@ -5,6 +5,7 @@ use artifacts::ArtifactLayer;
 use builds::cargo::CargoBuildLayer;
 use builds::{BuildLayer, CommonBuildLayer};
 use ci::github::GithubCiLayer;
+use ci::forgejo::ForgejoCiLayer;
 use ci::{CiLayer, CommonCiLayer};
 use hosts::github::GithubHostLayer;
 use hosts::{CommonHostLayer, HostLayer};
@@ -178,6 +179,14 @@ impl DistMetadata {
                 None
             }
         });
+
+        let forgejo_ci_layer = list_to_bool_layer(is_global, &ci, CiStyle::Forgejo, || {
+            // Create a basic Forgejo CI layer when Forgejo is requested
+            eprintln!("DEBUG: v0_to_v1 - Creating Forgejo CI layer in callback");
+            Some(ForgejoCiLayer::default())
+        });
+        eprintln!("DEBUG: v0_to_v1 - forgejo_ci_layer result: {:?}", forgejo_ci_layer.is_some());
+
         let has_github_ci = github_ci_layer.is_some();
         let custom_publish_jobs = publish_jobs.as_ref().map(|jobs| {
             jobs.iter()
@@ -200,6 +209,7 @@ impl DistMetadata {
             custom_publish_jobs
         };
         let needs_ci_layer = github_ci_layer.is_some()
+            || forgejo_ci_layer.is_some()
             || merge_tasks.is_some()
             || fail_fast.is_some()
             || cache_builds.is_some()
@@ -230,9 +240,10 @@ impl DistMetadata {
                 publish_jobs: custom_publish_jobs,
                 post_announce_jobs,
             },
-            github: github_ci_layer,
-            forgejo: None,
+            github: github_ci_layer.clone(),
+            forgejo: forgejo_ci_layer.clone(),
         });
+        eprintln!("DEBUG: v0_to_v1 - ci_layer forgejo: {:?}", ci_layer.as_ref().map(|l| l.forgejo.is_some()));
 
         // hosts
         let mut github_host_layer =
@@ -367,6 +378,7 @@ impl DistMetadata {
         });
 
         // done!
+        eprintln!("DEBUG: v0_to_v1 - TomlLayer ci: {:?}", ci_layer.as_ref().map(|l| format!("github: {:?}, forgejo: {:?}", l.github.is_some(), l.forgejo.is_some())));
 
         TomlLayer {
             dist_version: cargo_dist_version,

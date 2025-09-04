@@ -1263,6 +1263,7 @@ impl<'pkg_graph> DistGraphBuilder<'pkg_graph> {
                 announcement_title: None,
                 announcement_changelog: None,
                 announcement_github_body: None,
+                announcement_forgejo_body: None,
                 releases: vec![],
                 artifacts: Default::default(),
                 systems,
@@ -2011,16 +2012,57 @@ impl<'pkg_graph> DistGraphBuilder<'pkg_graph> {
         if !self.global_artifacts_enabled() {
             return Ok(());
         }
-        let release = self.release(to_release);
-        let Some(config) = &release.config.installers.shell else {
-            return Ok(());
+        // Extract values we need without holding a reference to release
+        let (release_id, app_name, version, config, platform_support, release_clone) = {
+            let release = self.release(to_release);
+            let Some(config) = &release.config.installers.shell else {
+                return Ok(());
+            };
+            require_nonempty_installer(release, config)?;
+            (
+                release.id.clone(),
+                release.app_name.clone(),
+                release.version.to_string(),
+                config.clone(),
+                release.platform_support.clone(),
+                release.clone(),
+            )
         };
-        require_nonempty_installer(release, config)?;
-        let release_id = &release.id;
+
         let schema_release = self
             .manifest
-            .release_by_name(&release.app_name)
-            .expect("couldn't find the release!?");
+            .ensure_release(app_name.clone(), version.clone());
+
+        // For Forgejo, populate hosting info since ensure_release creates a minimal release
+        if schema_release.hosting.is_empty() {
+            if let Some(repo_url) = &release_clone.app_repository_url {
+                // Simple URL parsing for https://host/owner/repo format
+                if repo_url.starts_with("https://") {
+                    if let Some(after_scheme) = repo_url.strip_prefix("https://") {
+                        let parts: Vec<&str> = after_scheme.splitn(2, '/').collect();
+                        if parts.len() == 2 {
+                            let host = parts[0];
+                            let path_parts: Vec<&str> = parts[1].trim_end_matches('/').split('/').collect();
+                            if path_parts.len() >= 2 {
+                                let owner = path_parts[0];
+                                let repo_name = path_parts[1];
+                                let base_url = format!("https://{}", host);
+                                
+                                schema_release.hosting = dist_schema::Hosting {
+                                    github: Some(dist_schema::GithubHosting {
+                                        artifact_base_url: base_url,
+                                        artifact_download_path: format!("/{}/{}/releases/download/{}/", owner, repo_name, version.clone()),
+                                        owner: owner.to_string(),
+                                        repo: repo_name.to_string(),
+                                    }),
+                                    forgejo: None,
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let env_vars = schema_release.env.clone();
 
@@ -2035,8 +2077,7 @@ impl<'pkg_graph> DistGraphBuilder<'pkg_graph> {
         let desc = "Install prebuilt binaries via shell script".to_owned();
 
         // Get the artifacts
-        let artifacts = release
-            .platform_support
+        let artifacts = platform_support
             .fragments()
             .into_iter()
             .filter(|a| !a.target_triple.is_windows_msvc())
@@ -2052,7 +2093,7 @@ impl<'pkg_graph> DistGraphBuilder<'pkg_graph> {
         };
         let bin_aliases = BinaryAliases(config.bin_aliases.clone()).for_targets(&target_triples);
 
-        let runtime_conditions = release.platform_support.safe_conflated_runtime_conditions();
+        let runtime_conditions = platform_support.safe_conflated_runtime_conditions();
 
         let installer_artifact = Artifact {
             id: artifact_name,
@@ -2064,8 +2105,8 @@ impl<'pkg_graph> DistGraphBuilder<'pkg_graph> {
             kind: ArtifactKind::Installer(InstallerImpl::Shell(InstallerInfo {
                 release: to_release,
                 dest_path: artifact_path,
-                app_name: release.app_name.clone(),
-                app_version: release.version.to_string(),
+                app_name: app_name.clone(),
+                app_version: version.clone(),
                 install_paths: config
                     .install_path
                     .iter()
@@ -2077,7 +2118,7 @@ impl<'pkg_graph> DistGraphBuilder<'pkg_graph> {
                 artifacts,
                 hint,
                 desc,
-                receipt: InstallReceipt::from_metadata(&self.inner, release)?,
+                receipt: InstallReceipt::from_metadata(&self.inner, &release_clone)?,
                 bin_aliases,
                 install_libraries: config.install_libraries.clone(),
                 runtime_conditions,
@@ -3013,6 +3054,8 @@ impl<'pkg_graph> DistGraphBuilder<'pkg_graph> {
 
     fn compute_ci(&mut self) -> DistResult<()> {
         let CiConfig { github, forgejo } = &self.inner.config.ci;
+        
+        eprintln!("DEBUG: compute_ci - github: {:?}, forgejo: {:?}", github.is_some(), forgejo.is_some());
 
         let mut has_ci = false;
         if let Some(github_config) = github {
@@ -3021,13 +3064,15 @@ impl<'pkg_graph> DistGraphBuilder<'pkg_graph> {
         }
         if let Some(_forgejo_config) = forgejo {
             has_ci = true;
+            eprintln!("DEBUG: tasks/mod.rs - Setting up Forgejo CI");
             use crate::backend::ci::forgejo::generate_forgejo_ci;
             self.inner.ci.forgejo = Some(generate_forgejo_ci(&self.inner)?);
         }
 
         // apply to manifest
         if has_ci {
-            let CiInfo { github, forgejo: _ } = &self.inner.ci;
+            eprintln!("DEBUG: tasks/mod.rs - Applying CI to manifest");
+            let CiInfo { github, forgejo } = &self.inner.ci;
             let github = github.as_ref().map(|info| {
                 let external_repo_commit = info
                     .github_release
@@ -3040,7 +3085,15 @@ impl<'pkg_graph> DistGraphBuilder<'pkg_graph> {
                 }
             });
 
-            self.manifest.ci = Some(dist_schema::CiInfo { github });
+            let forgejo = forgejo.as_ref().map(|info| {
+                eprintln!("DEBUG: tasks/mod.rs - Creating Forgejo CI manifest info");
+                dist_schema::ForgejoCiInfo {
+                    artifacts_matrix: Some(info.artifacts_matrix.clone()),
+                    pr_run_mode: Some(info.pr_run_mode),
+                }
+            });
+
+            self.manifest.ci = Some(dist_schema::CiInfo { github, forgejo });
         }
 
         Ok(())
@@ -3323,6 +3376,8 @@ fn find_tool(name: &str, test_flag: &str) -> Option<Tool> {
 pub enum ReleaseSourceType {
     /// GitHub Releases
     GitHub,
+    /// Forgejo/Codeberg Releases
+    Forgejo,
     /// Axo releases
     Axo,
 }
@@ -3409,6 +3464,8 @@ impl InstallReceipt {
         };
         let source_type = if hosting.hosts.contains(&HostingStyle::Github) {
             ReleaseSourceType::GitHub
+        } else if hosting.hosts.contains(&HostingStyle::Forgejo) {
+            ReleaseSourceType::Forgejo
         } else {
             return Err(DistError::NoGitHubHosting {});
         };

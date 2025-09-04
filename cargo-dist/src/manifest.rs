@@ -78,6 +78,7 @@ pub(crate) fn load_and_merge_manifests(
             announcement_title: _,
             announcement_changelog: _,
             announcement_github_body: _,
+            announcement_forgejo_body: _,
             publish_prereleases: _,
             force_latest: _,
             upload_files: _,
@@ -106,7 +107,7 @@ pub(crate) fn load_and_merge_manifests(
             let out_release =
                 output.ensure_release(release.app_name.clone(), release.app_version.clone());
             // If the input has hosting info, apply it
-            let Hosting { github } = release.hosting;
+            let Hosting { github, forgejo: _ } = release.hosting;
             if let Some(hosting) = github {
                 out_release.hosting.github = Some(hosting);
             }

@@ -304,8 +304,8 @@ pub enum DistError {
     },
 
     /// unrecognized hosting style
-    #[error("No GitHub hosting is defined!")]
-    #[diagnostic(help("Releases must have at least GitHub hosting for updates to be supported."))]
+    #[error("No supported hosting is defined!")]
+    #[diagnostic(help("Releases must have at least GitHub or Forgejo hosting for updates to be supported."))]
     NoGitHubHosting {},
 
     /// unrecognized ci style

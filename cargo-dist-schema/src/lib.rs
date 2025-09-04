@@ -81,6 +81,9 @@ declare_strongly_typed_string! {
     /// The name of a Github Actions Runner, like `ubuntu-22.04` or `macos-13`
     pub struct GithubRunner => &GithubRunnerRef;
 
+    /// The name of a Forgejo Actions Runner, like `ubuntu-22.04` or `debian-latest`
+    pub struct ForgejoRunner => &ForgejoRunnerRef;
+
     /// A container image, like `quay.io/pypa/manylinux_2_28_x86_64`
     pub struct ContainerImage => &ContainerImageRef;
 }
@@ -175,6 +178,10 @@ pub struct DistManifest {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub announcement_github_body: Option<String>,
+    /// Markdown body to include in the Forgejo Release
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub announcement_forgejo_body: Option<String>,
     /// Info about the toolchain used to build this announcement
     ///
     /// DEPRECATED: never appears anymore
@@ -308,6 +315,9 @@ pub struct CiInfo {
     /// GitHub CI backend
     #[serde(skip_serializing_if = "Option::is_none")]
     pub github: Option<GithubCiInfo>,
+    /// Forgejo CI backend
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub forgejo: Option<ForgejoCiInfo>,
 }
 
 /// Github CI backend
@@ -326,6 +336,18 @@ pub struct GithubCiInfo {
     pub external_repo_commit: Option<String>,
 }
 
+/// Forgejo CI backend
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ForgejoCiInfo {
+    /// Forgejo CI Matrix for upload-artifacts
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub artifacts_matrix: Option<GithubMatrix>,
+
+    /// What kind of job to run on pull request
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pr_run_mode: Option<PrRunMode>,
+}
+
 /// Github CI Matrix
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GithubMatrix {
@@ -336,6 +358,24 @@ pub struct GithubMatrix {
 }
 
 impl GithubMatrix {
+    /// Gets if the matrix has no entries
+    ///
+    /// this is useful for checking if there should be No matrix
+    pub fn is_empty(&self) -> bool {
+        self.include.is_empty()
+    }
+}
+
+/// Forgejo CI Matrix
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ForgejoMatrix {
+    /// define each task manually rather than doing cross-product stuff
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub include: Vec<ForgejoLocalJobConfig>,
+}
+
+impl ForgejoMatrix {
     /// Gets if the matrix has no entries
     ///
     /// this is useful for checking if there should be No matrix
@@ -402,6 +442,38 @@ pub struct GithubRunnerConfig {
 }
 
 impl GithubRunnerConfig {
+    /// If the container runs through a container, that container might have a different
+    /// architecture than the outer VM — this returns the container's triple if any,
+    /// and falls back to the "machine"'s triple if not.
+    pub fn real_triple_name(&self) -> &TripleNameRef {
+        if let Some(container) = &self.container {
+            &container.host
+        } else {
+            &self.host
+        }
+    }
+
+    /// cf. [`Self::real_triple_name`], but parsed
+    pub fn real_triple(&self) -> Triple {
+        self.real_triple_name().parse().unwrap()
+    }
+}
+
+/// Forgejo runner config (final, computed version)
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ForgejoRunnerConfig {
+    /// Forgejo Actions `runs-on` key: runner image to use
+    pub runner: ForgejoRunner,
+
+    /// Host triple of the runner (well-known, custom, or best guess).
+    pub host: TripleName,
+
+    /// Container image to run the job in
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub container: Option<ContainerConfig>,
+}
+
+impl ForgejoRunnerConfig {
     /// If the container runs through a container, that container might have a different
     /// architecture than the outer VM — this returns the container's triple if any,
     /// and falls back to the "machine"'s triple if not.
@@ -507,6 +579,40 @@ pub struct GithubLocalJobConfig {
     pub cache_provider: Option<String>,
 }
 
+/// Used in `forgejo/release.yml.j2` to template out "local" build jobs
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ForgejoLocalJobConfig {
+    /// Where to run this job?
+    #[serde(flatten)]
+    pub runner: ForgejoRunnerConfig,
+
+    /// Expression to execute to install dist
+    pub install_dist: ForgejoRunStep,
+
+    /// Arguments to pass to dist
+    pub dist_args: String,
+
+    /// Target triples to build for
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub targets: Option<Vec<TripleName>>,
+
+    /// Expression to execute to install cargo-auditable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub install_cargo_auditable: Option<ForgejoRunStep>,
+
+    /// Expression to execute to install omnibor-cli
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub install_omnibor: Option<ForgejoRunStep>,
+
+    /// Command to run to install dependencies
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub packages_install: Option<PackageInstallScript>,
+
+    /// What cache provider to use
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_provider: Option<String>,
+}
+
 /// Used to capture GitHub Attestations filters
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct GithubAttestationsFilters(Vec<String>);
@@ -581,6 +687,30 @@ impl From<DashScript> for GhaRunStep {
 }
 
 impl From<PowershellScript> for GhaRunStep {
+    fn from(powershell: PowershellScript) -> Self {
+        Self::Powershell(powershell)
+    }
+}
+
+/// A Forgejo Actions "run" step, either bash or powershell
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum ForgejoRunStep {
+    /// see [`DashScript`]
+    #[serde(rename = "sh")]
+    Dash(DashScript),
+    /// see [`PowershellScript`]
+    #[serde(rename = "pwsh")]
+    Powershell(PowershellScript),
+}
+
+impl From<DashScript> for ForgejoRunStep {
+    fn from(bash: DashScript) -> Self {
+        Self::Dash(bash)
+    }
+}
+
+impl From<PowershellScript> for ForgejoRunStep {
     fn from(powershell: PowershellScript) -> Self {
         Self::Powershell(powershell)
     }
@@ -932,6 +1062,7 @@ impl DistManifest {
             announcement_title: None,
             announcement_changelog: None,
             announcement_github_body: None,
+            announcement_forgejo_body: None,
             github_attestations: false,
             github_attestations_filters: Default::default(),
             github_attestations_phase: Default::default(),
@@ -1066,6 +1197,10 @@ pub struct Hosting {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub github: Option<GithubHosting>,
+    /// Hosted on Forgejo/Codeberg Releases
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub forgejo: Option<ForgejoHosting>,
 }
 
 /// Github Hosting
@@ -1084,22 +1219,41 @@ pub struct GithubHosting {
     pub repo: String,
 }
 
+/// Forgejo/Codeberg Hosting
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+pub struct ForgejoHosting {
+    /// The domain/URL of the Forgejo instance
+    pub domain: String,
+    /// The path of the release without the base URL
+    pub artifact_download_path: String,
+    /// The owner of the repo
+    pub owner: String,
+    /// The name of the repo
+    pub name: String,
+}
+
 impl Hosting {
     /// Get the base URL that artifacts should be downloaded from (append the artifact name to the URL)
     pub fn artifact_download_url(&self) -> Option<String> {
-        let Hosting { github } = &self;
+        let Hosting { github, forgejo } = &self;
         if let Some(host) = &github {
             return Some(format!(
                 "{}{}",
                 host.artifact_base_url, host.artifact_download_path
             ));
         }
+        if let Some(host) = &forgejo {
+            return Some(format!(
+                "https://{}{}",
+                host.domain, host.artifact_download_path
+            ));
+        }
         None
     }
     /// Gets whether there's no hosting
     pub fn is_empty(&self) -> bool {
-        let Hosting { github } = &self;
-        github.is_none()
+        let Hosting { github, forgejo } = &self;
+        github.is_none() && forgejo.is_none()
     }
 }
 

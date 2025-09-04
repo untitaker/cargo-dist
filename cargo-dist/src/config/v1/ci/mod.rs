@@ -58,6 +58,7 @@ impl CiConfigInheritable {
             default
         });
         let forgejo = forgejo.map(|forgejo| {
+            eprintln!("DEBUG: ci/mod.rs - Creating final ForgejoCiConfig");
             let mut default = ForgejoCiConfig::defaults_for_workspace(workspaces, &common);
             default.apply_layer(forgejo);
             default
@@ -68,9 +69,11 @@ impl CiConfigInheritable {
 impl ApplyLayer for CiConfigInheritable {
     type Layer = CiLayer;
     fn apply_layer(&mut self, Self::Layer { common, github, forgejo }: Self::Layer) {
+        eprintln!("DEBUG: CiConfigInheritable::apply_layer - forgejo layer: {:?}", forgejo.is_some());
         self.common.apply_layer(common);
         self.github.apply_bool_layer(github);
         self.forgejo.apply_bool_layer(forgejo);
+        eprintln!("DEBUG: CiConfigInheritable::apply_layer - after apply, self.forgejo: {:?}", self.forgejo.is_some());
     }
 }
 

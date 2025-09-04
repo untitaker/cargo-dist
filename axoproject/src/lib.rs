@@ -34,6 +34,8 @@ mod tests;
 
 pub use crate::repo::GithubRepo;
 use crate::repo::GithubRepoInput;
+pub use crate::repo::ForgejoRepo;
+use crate::repo::ForgejoRepoInput;
 /// A sorted map impl
 pub type SortedMap<K, V> = std::collections::BTreeMap<K, V>;
 
@@ -398,6 +400,11 @@ impl RepositoryUrl {
     /// Returns a struct which contains the repository's owner and name.
     pub fn github_repo(&self) -> Result<GithubRepo> {
         GithubRepoInput::new(self.0.clone())?.parse()
+    }
+    
+    /// Returns a struct which contains the Forgejo repository's domain, owner and name.
+    pub fn forgejo_repo(&self) -> Result<ForgejoRepo> {
+        ForgejoRepoInput::new(self.0.clone())?.parse()
     }
 }
 

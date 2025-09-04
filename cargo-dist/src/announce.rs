@@ -188,6 +188,7 @@ impl<'a> DistGraphBuilder<'a> {
         // Refine the answers
         self.compute_announcement_changelog(announcing);
         self.compute_announcement_github();
+        self.compute_announcement_forgejo();
     }
 
     /// Try to compute changelogs for the announcement
@@ -241,6 +242,12 @@ impl<'a> DistGraphBuilder<'a> {
     /// If we're publishing to Github, generate some Github notes
     fn compute_announcement_github(&mut self) {
         announcement_github(&mut self.manifest);
+    }
+    
+    /// If we're publishing to Forgejo, generate some Forgejo notes
+    fn compute_announcement_forgejo(&mut self) {
+        eprintln!("DEBUG: announce.rs - Computing Forgejo announcement");
+        announcement_forgejo(&mut self.manifest);
     }
 }
 
@@ -981,6 +988,45 @@ pub fn announcement_github(manifest: &mut DistManifest) {
     if announcing_github {
         info!("successfully generated github release body!");
         manifest.announcement_github_body = Some(gh_body);
+    }
+}
+
+/// Generate Forgejo release announcement body
+pub fn announcement_forgejo(manifest: &mut DistManifest) {
+    use std::fmt::Write;
+
+    let mut forgejo_body = String::new();
+
+    // For now, Forgejo announcements are identical to GitHub ones, 
+    // but without attestations support
+    let mut announcing_forgejo = false;
+    for release in &manifest.releases {
+        // Only bother if there's actually forgejo hosting
+        if release.hosting.forgejo.is_none() {
+            continue;
+        }
+        // Skip "hidden" apps (simplified for now)
+        // if release.display.hide_changelog_entry {
+        //     continue;
+        // }
+        announcing_forgejo = true;
+
+        let display_name = release.display_name.as_ref().unwrap_or(&release.app_name);
+        let heading_suffix = format!("{} {}", display_name, release.app_version);
+
+        // Do the heading
+        writeln!(&mut forgejo_body, "## {}", heading_suffix).unwrap();
+
+        // Simplified Forgejo announcement - just basic info for now
+        writeln!(&mut forgejo_body, "Release notes for {display_name} {}", release.app_version).unwrap();
+
+        // For simplicity, we don't add attestation support for Forgejo yet
+        // since it doesn't have built-in attestation features like GitHub
+    }
+
+    if announcing_forgejo {
+        info!("successfully generated forgejo release body!");
+        manifest.announcement_forgejo_body = Some(forgejo_body);
     }
 }
 

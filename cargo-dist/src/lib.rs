@@ -876,6 +876,7 @@ pub fn run_generate(dist: &DistGraph, args: &GenerateArgs) -> DistResult<()> {
                     // If you add a CI backend, call it here
                     let CiInfo { github, forgejo } = &dist.ci;
                     if let Some(github) = github {
+                        eprintln!("DEBUG: lib.rs - Processing GitHub CI");
                         if args.check {
                             github.check(dist)?;
                         } else {
@@ -883,6 +884,7 @@ pub fn run_generate(dist: &DistGraph, args: &GenerateArgs) -> DistResult<()> {
                         }
                     }
                     if let Some(forgejo) = forgejo {
+                        eprintln!("DEBUG: lib.rs - Processing Forgejo CI");
                         if args.check {
                             forgejo.load_and_check_schema(dist)?;
                         } else {

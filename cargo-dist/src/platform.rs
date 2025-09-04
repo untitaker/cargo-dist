@@ -228,6 +228,7 @@
 #![allow(rustdoc::private_intra_doc_links)]
 
 pub mod github_runners;
+pub mod forgejo_runners;
 pub mod targets;
 
 use std::collections::HashMap;

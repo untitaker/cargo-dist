@@ -196,19 +196,38 @@ pub(crate) fn select_hosting(
         }
     };
 
-    // Currently there's only one supported sourcehost provider
-    let repo = raw_repository_url
-        .github_repo()
-        .map_err(|e| DistError::CantEnableGithubUrlNotGithub { inner: e })?;
-    let domain = repo.domain();
-    let repo_path = repo.web_path();
+    // Try GitHub first, then Forgejo
+    if let Ok(repo) = raw_repository_url.github_repo() {
+        let domain = repo.domain();
+        let repo_path = repo.web_path();
 
-    Ok(Some(HostingInfo {
-        hosts: hosting_providers,
-        domain,
-        repo_path,
-        source_host: "github".to_owned(),
-        owner: repo.owner,
-        project: repo.name,
-    }))
+        eprintln!("DEBUG: host.rs - Found GitHub repo: {}", repo);
+        Ok(Some(HostingInfo {
+            hosts: hosting_providers,
+            domain,
+            repo_path,
+            source_host: "github".to_owned(),
+            owner: repo.owner,
+            project: repo.name,
+        }))
+    } else if let Ok(repo) = raw_repository_url.forgejo_repo() {
+        let domain = repo.domain();
+        let repo_path = repo.web_path();
+
+        eprintln!("DEBUG: host.rs - Found Forgejo repo: {} on {}", repo, repo.domain);
+        Ok(Some(HostingInfo {
+            hosts: hosting_providers,
+            domain,
+            repo_path,
+            source_host: "forgejo".to_owned(),
+            owner: repo.owner,
+            project: repo.name,
+        }))
+    } else {
+        Err(DistError::CantEnableGithubUrlNotGithub { 
+            inner: axoproject::errors::AxoprojectError::NotGitHubError { 
+                url: raw_repository_url.0.clone() 
+            } 
+        })
+    }
 }
